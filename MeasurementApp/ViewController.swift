@@ -13,20 +13,17 @@ class ViewController: UIViewController, ARSCNViewDelegate {
 
     @IBOutlet var sceneView: ARSCNView!
     
+    
+    private var dotNodes = [SCNNode]()
+    private var textNodes = SCNNode()
+    private var meterValue: Double?
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
         // Set the view's delegate
         sceneView.delegate = self
-        
-        // Show statistics such as fps and timing information
-        sceneView.showsStatistics = true
-        
-        // Create a new scene
-        let scene = SCNScene(named: "art.scnassets/ship.scn")!
-        
-        // Set the scene to the view
-        sceneView.scene = scene
+        sceneView.debugOptions = [ARSCNDebugOptions.showFeaturePoints]
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -46,29 +43,85 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         sceneView.session.pause()
     }
 
-    // MARK: - ARSCNViewDelegate
     
-/*
-    // Override to create and configure nodes for anchors added to the view's session.
-    func renderer(_ renderer: SCNSceneRenderer, nodeFor anchor: ARAnchor) -> SCNNode? {
-        let node = SCNNode()
-     
-        return node
-    }
-*/
-    
-    func session(_ session: ARSession, didFailWithError error: Error) {
-        // Present an error message to the user
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if dotNodes.count >= 2 {
+            for dot in dotNodes {
+                dot.removeFromParentNode()
+            }
+        }
         
+        dotNodes = [SCNNode]()
+        
+        if let touchLocation = touches.first?.location(in: sceneView) {
+//            let hitTestResult = sceneView.hitTest(touchLocation, types: .featurePoint)
+//            if let hitResult = hitTestResult.first {
+//                addDot(at: hitResult)
+//            }
+            let estimatedPlane: ARRaycastQuery.Target = .estimatedPlane
+            let alignment: ARRaycastQuery.TargetAlignment = .any
+            
+            let query: ARRaycastQuery? = sceneView.raycastQuery(from: touchLocation, allowing: estimatedPlane, alignment: alignment)
+            
+            if let nonOptQuery: ARRaycastQuery = query {
+                let result: [ARRaycastResult] = sceneView.session.raycast(nonOptQuery)
+                guard let rayCast: ARRaycastResult = result.first else { return }
+                addDot(at: rayCast)
+            }
+        }
     }
     
-    func sessionWasInterrupted(_ session: ARSession) {
-        // Inform the user that the session has been interrupted, for example, by presenting an overlay
+    
+    //hitResult: ARHitTestResult
+    private func addDot(at hitResult: ARRaycastResult) {
+        let dotGeometry = SCNSphere(radius: 0.002)
+        let material = SCNMaterial()
+        material.diffuse.contents = UIColor.darkGray
+        dotGeometry.materials = [material]
         
+        let dotNode = SCNNode(geometry: dotGeometry)
+        dotNode.position = SCNVector3(hitResult.worldTransform.columns.3.x, hitResult.worldTransform.columns.3.y, hitResult.worldTransform.columns.3.z)
+        
+        sceneView.scene.rootNode.addChildNode(dotNode)
+        
+        dotNodes.append(dotNode)
+        
+        if dotNodes.count >= 2 {
+            calculate()
+        }
     }
     
-    func sessionInterruptionEnded(_ session: ARSession) {
-        // Reset tracking and/or remove existing anchors if consistent tracking is required
+    private func calculate() {
+        let start = dotNodes[0]
+        let end = dotNodes[1]
         
+        let distance = sqrt(
+            pow(end.position.x - start.position.x, 2) +
+            pow(end.position.y - start.position.y, 2) +
+            pow(end.position.z - start.position.z, 2)
+        )
+        
+        meterValue = Double(abs(distance))
+        
+        let heightMeter = Measurement(value: meterValue ?? 0, unit: UnitLength.meters)
+        //let heightInches = heightMeter.converted(to: UnitLength.inches)
+        let heightCentimeter = heightMeter.converted(to: UnitLength.centimeters)
+
+        let value = "\(heightCentimeter)"
+        let finalMeasurement = String(value.prefix(6))
+        updateText(text: finalMeasurement, atPosition: end.position)
     }
+    
+    private func updateText(text: String, atPosition position: SCNVector3) {
+        textNodes.removeFromParentNode()
+        let textGeometry = SCNText(string: text, extrusionDepth: 1.0)
+        textGeometry.firstMaterial?.diffuse.contents = UIColor.darkGray
+        textNodes = SCNNode(geometry: textGeometry)
+        textNodes.position = SCNVector3(x: position.x, y: position.y + 0.01, z: position.z)
+        textNodes.scale = SCNVector3(x: 0.01, y: 0.01, z: 0.01)
+        sceneView.scene.rootNode.addChildNode(textNodes)
+    }
+    
+    
+    
 }
