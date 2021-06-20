@@ -45,14 +45,14 @@ class ViewController: UIViewController, ARSCNViewDelegate {
 
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        debugPrint("Dot counts", dotNodes.count)
         if dotNodes.count >= 2 {
             for dot in dotNodes {
                 dot.removeFromParentNode()
             }
+            dotNodes = [SCNNode]()
         }
-        
-        dotNodes = [SCNNode]()
-        
+    
         if let touchLocation = touches.first?.location(in: sceneView) {
 //            let hitTestResult = sceneView.hitTest(touchLocation, types: .featurePoint)
 //            if let hitResult = hitTestResult.first {
@@ -60,23 +60,27 @@ class ViewController: UIViewController, ARSCNViewDelegate {
 //            }
             let estimatedPlane: ARRaycastQuery.Target = .estimatedPlane
             let alignment: ARRaycastQuery.TargetAlignment = .any
-            
+
             let query: ARRaycastQuery? = sceneView.raycastQuery(from: touchLocation, allowing: estimatedPlane, alignment: alignment)
-            
+
             if let nonOptQuery: ARRaycastQuery = query {
                 let result: [ARRaycastResult] = sceneView.session.raycast(nonOptQuery)
                 guard let rayCast: ARRaycastResult = result.first else { return }
                 addDot(at: rayCast)
             }
+        } else {
+            debugPrint("No touchLocation found")
         }
+        
+        
     }
     
     
-    //hitResult: ARHitTestResult
+    //hitResult: ARHitTestResult ARRaycastResult
     private func addDot(at hitResult: ARRaycastResult) {
-        let dotGeometry = SCNSphere(radius: 0.002)
+        let dotGeometry = SCNSphere(radius: 0.005)
         let material = SCNMaterial()
-        material.diffuse.contents = UIColor.darkGray
+        material.diffuse.contents = UIColor.red
         dotGeometry.materials = [material]
         
         let dotNode = SCNNode(geometry: dotGeometry)
@@ -95,6 +99,9 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         let start = dotNodes[0]
         let end = dotNodes[1]
         
+        debugPrint("Start", start)
+        debugPrint("End", end)
+
         let distance = sqrt(
             pow(end.position.x - start.position.x, 2) +
             pow(end.position.y - start.position.y, 2) +
@@ -115,7 +122,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
     private func updateText(text: String, atPosition position: SCNVector3) {
         textNodes.removeFromParentNode()
         let textGeometry = SCNText(string: text, extrusionDepth: 1.0)
-        textGeometry.firstMaterial?.diffuse.contents = UIColor.darkGray
+        textGeometry.firstMaterial?.diffuse.contents = UIColor.red
         textNodes = SCNNode(geometry: textGeometry)
         textNodes.position = SCNVector3(x: position.x, y: position.y + 0.01, z: position.z)
         textNodes.scale = SCNVector3(x: 0.01, y: 0.01, z: 0.01)
